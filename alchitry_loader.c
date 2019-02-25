@@ -268,14 +268,12 @@ int main(int argc, char *argv[]) {
         }
       }
 
-      /*
       if (fpga_flash) {
         if (!loader_write_bin(loader, fpga_bin_flash, true, au_bridge_bin)) {
           fprintf(stderr, "Failed to write FPGA flash!\n");
           return 2;
         }
       }
-      */
 
       if (fpga_ram) {
         if (!loader_write_bin(loader, fpga_bin_ram, false, NULL)) {

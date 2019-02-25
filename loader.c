@@ -10,7 +10,7 @@ static unsigned char reverse(unsigned char b) {
   return b;
 }
 
-static size_t slurp_file(char *file, char **buf) {
+static size_t slurp_file(char *file, char **buf, bool rev) {
   size_t ret = 0;
   FILE *fp = fopen(file, "r");
   if (fp) {
@@ -22,7 +22,9 @@ static size_t slurp_file(char *file, char **buf) {
     *buf = calloc(2, sz + 1);
     sz = fread(tmp, 1, sz, fp);
     for (int j = 0; j < sz; j++) {
-      ret += sprintf(*buf + ret, "%02x", reverse(tmp[sz - j - 1]));
+      unsigned char b = tmp[sz - j - 1];
+      if (rev) b = reverse(b);
+      ret += sprintf(*buf + ret, "%02x", b);
     }
     free(tmp);
     fclose(fp);
@@ -111,7 +113,7 @@ bool loader_shift_IR(struct loader_ctx *loader, int bits, char *write,
 
 bool loader_load_bin(struct loader_ctx *loader, char *file) {
   char *binstr = NULL;
-  size_t binstrlen = slurp_file(file, &binstr);
+  size_t binstrlen = slurp_file(file, &binstr, true);
 
   if (!jtag_set_freq(loader->device, 10000000)) {
     fprintf(stderr, "Failed to set JTAG frequency!\n");
@@ -218,7 +220,7 @@ bool loader_write_bin(struct loader_ctx *loader, char *bin_file, bool flash,
                       char *loader_file) {
   if (flash) {
     char *binstr = NULL;
-    size_t binstrlen = slurp_file(loader_file, &binstr);
+    size_t binstrlen = slurp_file(bin_file, &binstr, false);
 
     fprintf(stdout, "Initializing FPGA...\n");
     if (!loader_load_bin(loader, loader_file)) {
