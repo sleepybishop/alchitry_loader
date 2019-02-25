@@ -373,23 +373,18 @@ bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
   }
 
   bool ret = true;
-  /*
   if (read) {
     // Read out the data from input buffer
     char *hextdo;
     int hextdoat = 0;
+    int tdo_off = tdo_bytes - strlen(mask)/2;
     hextdo = calloc(1, tdo_bytes * 2 + 1);
 
-    for (int i = tdo_bytes - 1; i >= 0; i--) {
+    for (int i = tdo_bytes - 1 - tdo_off; i >= 0; i--) {
       sprintf(hextdo + hextdoat, "%02X", tdo_buf[i]);
       hextdoat += 2;
     }
-    if ((strlen(hextdo) - 1) == strlen(mask)) {
-      hextdoat = strlen(hextdo) - 1;
-      hextdo[hextdoat] = 0x0;
-    }
 
-    fprintf(stdout, "hextdolen: %d\n", strlen(hextdo));
     if (!compare_hex_string(hextdo, tdo, mask)) {
       fprintf(stderr, "TDO didn't match expected string: \n");
       fprintf(stderr, "TDO:       %s\n", hextdo);
@@ -399,7 +394,6 @@ bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
     }
     free(hextdo);
   }
-  */
   return ret;
 }
 
