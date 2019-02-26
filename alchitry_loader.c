@@ -54,7 +54,7 @@ void erase(struct ftdi_context *ftdi) {
   fprintf(stdout, "Done.\n");
 }
 
-bool program_device(struct ftdi_context *ftdi, unsigned int device_num) {
+bool program_device(struct ftdi_context *ftdi, unsigned int device_num, bool au) {
 
   if (0 >
       ftdi_set_interface(ftdi, (device_num == 0) ? INTERFACE_A : INTERFACE_B)) {
@@ -72,7 +72,11 @@ bool program_device(struct ftdi_context *ftdi, unsigned int device_num) {
 
   erase(ftdi);
 
-  ftdi_eeprom_initdefaults(ftdi, "Alchitry", "Alchitry Au", "FT3KRFFN");
+  if (au) {
+    ftdi_eeprom_initdefaults(ftdi, "Alchitry", "Alchitry Au", "FT3KRFFN");
+  } else {
+    ftdi_eeprom_initdefaults(ftdi, "Alchitry", "Alchitry Cu", "FT3WSDT8");
+  }
   ftdi_set_eeprom_value(ftdi, VENDOR_ID, 0x0403);
   ftdi_set_eeprom_value(ftdi, PRODUCT_ID, 0x6010);
   ftdi_set_eeprom_value(ftdi, RELEASE_NUMBER, 0x700);
@@ -185,7 +189,7 @@ int main(int argc, char *argv[]) {
   int i = 0;
   bool fpga_flash = false, fpga_ram = false, eeprom = false;
   bool erase = false, list = false, print = false;
-  bool bridge_provided = false;
+  bool bridge_provided = false, is_au = false;
   char *fpga_bin_flash, *fpga_bin_ram, *au_bridge_bin;
   int device_num = 0;
 
@@ -196,7 +200,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  while ((i = getopt(argc, argv, "elhf:r:u:b:p:")) != -1) {
+  while ((i = getopt(argc, argv, "elhf:r:u:b:p:t:")) != -1) {
     switch (i) {
     case 'e':
       erase = true;
@@ -225,19 +229,34 @@ int main(int argc, char *argv[]) {
       bridge_provided = true;
       au_bridge_bin = optarg;
       break;
+    case 't':
+      if (0 == strcasecmp(optarg, "au")) {
+        is_au = true;
+      } else if (0 == strcasecmp(optarg, "cu")) {
+        is_au = false;
+      } else {
+        fprintf(stdout, "Invalid board type\n");
+        print = true;
+      }
     default:
       print_usage();
     }
   }
 
-  if (print)
+  if (print) {
     print_usage();
+    return 0;
+  }
 
-  if (list)
+  if (list) {
     print_devices(ftdi);
+    return 0;
+  }
 
-  if (eeprom)
-    program_device(ftdi, device_num);
+  if (eeprom) {
+    program_device(ftdi, device_num, is_au);
+    return 0;
+  }
 
   if (erase || fpga_flash || fpga_ram) {
     int board_type = get_device_type(ftdi, device_num);
