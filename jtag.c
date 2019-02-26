@@ -6,6 +6,9 @@
 #define CHUNK_SIZE 65535
 #define USB_TIMEOUT 5000
 
+static bool sync_mpsse(struct ftdi_context *ftdi);
+static bool config_jtag(struct ftdi_context *ftdi);
+
 static unsigned char byte_from_hex_string(char *hex, unsigned int offset,
                                           unsigned int num) {
   char tmp[3] = {0, 0, 0};
@@ -60,7 +63,6 @@ struct jtag_ctx *jtag_new(struct ftdi_context *ftdi) {
 
   ctx->ftdi = ftdi;
   ctx->active = false;
-  ctx->ui_dev_index = 0xF;
 
   return ctx;
 }
@@ -85,12 +87,12 @@ bool jtag_initialize(struct jtag_ctx *jtag) {
   usleep(100000);
   ftdi_usb_purge_buffers(jtag->ftdi);
 
-  if (!jtag_sync_mpsse(jtag)) {
+  if (!sync_mpsse(jtag->ftdi)) {
     fprintf(stderr, "Failed to sync with MPSSE!\n");
     return false;
   }
 
-  if (!jtag_config(jtag)) {
+  if (!config_jtag(jtag->ftdi)) {
     fprintf(stderr, "Failed to set JTAG configuration!\n");
     return false;
   }
@@ -112,27 +114,27 @@ void jtag_shutdown(struct jtag_ctx *jtag) {
   }
 }
 
-bool jtag_sync_mpsse(struct jtag_ctx *jtag) {
+bool sync_mpsse(struct ftdi_context *ftdi) {
   unsigned char cmd[2] = {0xaa, 0x0};
   int cmdlen = 1;
 
-  if (cmdlen != ftdi_write_data(jtag->ftdi, cmd, cmdlen)) {
+  if (cmdlen != ftdi_write_data(ftdi, cmd, cmdlen)) {
     fprintf(stderr, "Failed to send bad command\n");
   }
 
   int n = 0, r = 0;
   while (n < cmdlen) {
-    r = ftdi_read_data(jtag->ftdi, cmd, cmdlen);
+    r = ftdi_read_data(ftdi, cmd, cmdlen);
     if (r < 0)
       break;
     n += r;
   }
-  ftdi_usb_purge_rx_buffer(jtag->ftdi);
+  ftdi_usb_purge_rx_buffer(ftdi);
 
   return n == cmdlen;
 }
 
-bool jtag_config(struct jtag_ctx *jtag) {
+bool config_jtag(struct ftdi_context *ftdi) {
   unsigned char cmd[3];
   int cmdlen = sizeof(cmd);
   int divisor = 0x05DB;
@@ -140,7 +142,7 @@ bool jtag_config(struct jtag_ctx *jtag) {
   cmd[0] = DIS_DIV_5;
   cmd[1] = DIS_ADAPTIVE;
   cmd[2] = DIS_3_PHASE;
-  if (cmdlen != ftdi_write_data(jtag->ftdi, cmd, cmdlen)) {
+  if (cmdlen != ftdi_write_data(ftdi, cmd, cmdlen)) {
     fprintf(stderr, "Failed to send speed command\n");
     return false;
   }
@@ -148,7 +150,7 @@ bool jtag_config(struct jtag_ctx *jtag) {
   cmd[0] = SET_BITS_LOW;
   cmd[1] = 0x08;
   cmd[2] = 0x0b;
-  if (cmdlen != ftdi_write_data(jtag->ftdi, cmd, cmdlen)) {
+  if (cmdlen != ftdi_write_data(ftdi, cmd, cmdlen)) {
     fprintf(stderr, "Failed to send low gpio command\n");
     return false;
   }
@@ -156,7 +158,7 @@ bool jtag_config(struct jtag_ctx *jtag) {
   cmd[0] = SET_BITS_HIGH;
   cmd[1] = 0x0;
   cmd[2] = 0x0;
-  if (cmdlen != ftdi_write_data(jtag->ftdi, cmd, cmdlen)) {
+  if (cmdlen != ftdi_write_data(ftdi, cmd, cmdlen)) {
     fprintf(stderr, "Failed to send high gpio command\n");
     return false;
   }
@@ -164,14 +166,14 @@ bool jtag_config(struct jtag_ctx *jtag) {
   cmd[0] = TCK_DIVISOR;
   cmd[1] = divisor & 0xff;
   cmd[2] = (divisor >> 8) & 0xff;
-  if (cmdlen != ftdi_write_data(jtag->ftdi, cmd, cmdlen)) {
+  if (cmdlen != ftdi_write_data(ftdi, cmd, cmdlen)) {
     fprintf(stderr, "Failed to send clock divisor command\n");
     return false;
   }
 
   cmd[0] = LOOPBACK_END;
   cmdlen = 1;
-  if (cmdlen != ftdi_write_data(jtag->ftdi, cmd, 1)) {
+  if (cmdlen != ftdi_write_data(ftdi, cmd, 1)) {
     fprintf(stderr, "Failed to send loopback command\n");
     return false;
   }
@@ -262,7 +264,7 @@ bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
     }
   }
 
-  if (!jtag_sync_mpsse(jtag))
+  if (!sync_mpsse(jtag->ftdi))
     return false;
 
   if (bits < 9) {

@@ -39,7 +39,6 @@ struct jtag_fsm_transitions {
 struct jtag_fsm_transitions get_transitions(enum jtag_fsm_state init,
                                             enum jtag_fsm_state final);
 const char *get_state_name(enum jtag_fsm_state state);
-enum jtag_fsm_state get_state_from_name(char *name);
 enum jtag_fsm_state get_transition(enum jtag_fsm_state state, bool tms);
 
 #ifdef __cplusplus

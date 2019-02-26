@@ -42,14 +42,6 @@ struct loader_ctx {
   enum jtag_fsm_state current_state;
 };
 
-bool loader_set_IR(struct loader_ctx *loader, enum instruction);
-bool loader_shift_DR(struct loader_ctx *loader, int bits, char *write,
-                     char *read, char *mask);
-bool loader_shift_IR(struct loader_ctx *loader, int, char *, char *, char *);
-
-bool loader_load_bin(struct loader_ctx *loader, char *file);
-bool loader_set_state(struct loader_ctx *loader, enum jtag_fsm_state state);
-
 struct loader_ctx *loader_new(struct jtag_ctx *jtag);
 bool loader_reset_state(struct loader_ctx *loader);
 bool loader_check_IDCODE(struct loader_ctx *loader);
