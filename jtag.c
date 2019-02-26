@@ -147,6 +147,16 @@ bool config_jtag(struct ftdi_context *ftdi) {
     return false;
   }
 
+  // Set initial states of the MPSSE interface - low byte, both pin directions and output values
+  // Pin name Signal Direction Config Initial State Config
+  // ADBUS0 TCK output 1 low 0
+  // ADBUS1 TDI output 1 low 0
+  // ADBUS2 TDO input 0 0
+  // ADBUS3 TMS output 1 high 1
+  // ADBUS4 GPIOL0 input 0 0
+  // ADBUS5 GPIOL1 input 0 0
+  // ADBUS6 GPIOL2 input 0 0
+  // ADBUS7 GPIOL3 input 0 0
   cmd[0] = SET_BITS_LOW;
   cmd[1] = 0x08;
   cmd[2] = 0x0b;
@@ -155,6 +165,16 @@ bool config_jtag(struct ftdi_context *ftdi) {
     return false;
   }
 
+  // Set initial states of the MPSSE interface - high byte, both pin directions and output values
+  // Pin name Signal Direction Config Initial State Config
+  // ACBUS0 GPIOH0 input 0 0
+  // ACBUS1 GPIOH1 input 0 0
+  // ACBUS2 GPIOH2 input 0 0
+  // ACBUS3 GPIOH3 input 0 0
+  // ACBUS4 GPIOH4 input 0 0
+  // ACBUS5 GPIOH5 input 0 0
+  // ACBUS6 GPIOH6 input 0 0
+  // ACBUS7 GPIOH7 input 0 0
   cmd[0] = SET_BITS_HIGH;
   cmd[1] = 0x0;
   cmd[2] = 0x0;
