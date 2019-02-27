@@ -147,7 +147,8 @@ bool config_jtag(struct ftdi_context *ftdi) {
     return false;
   }
 
-  // Set initial states of the MPSSE interface - low byte, both pin directions and output values
+  // Set initial states of the MPSSE interface - low byte, both pin directions
+  // and output values
   // Pin name Signal Direction Config Initial State Config
   // ADBUS0 TCK output 1 low 0
   // ADBUS1 TDI output 1 low 0
@@ -165,7 +166,8 @@ bool config_jtag(struct ftdi_context *ftdi) {
     return false;
   }
 
-  // Set initial states of the MPSSE interface - high byte, both pin directions and output values
+  // Set initial states of the MPSSE interface - high byte, both pin directions
+  // and output values
   // Pin name Signal Direction Config Initial State Config
   // ACBUS0 GPIOH0 input 0 0
   // ACBUS1 GPIOH1 input 0 0
@@ -399,7 +401,7 @@ bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
     // Read out the data from input buffer
     char *hextdo;
     int hextdoat = 0;
-    int tdo_off = tdo_bytes - strlen(mask)/2;
+    int tdo_off = tdo_bytes - strlen(mask) / 2;
     hextdo = calloc(1, tdo_bytes * 2 + 1);
 
     for (int i = tdo_bytes - 1 - tdo_off; i >= 0; i--) {

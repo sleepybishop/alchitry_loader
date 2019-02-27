@@ -201,7 +201,8 @@ bool config_spi(struct ftdi_context *ftdi) {
   }
 
   // Set initial states of the MPSSE interface - low byte, both pin directions
-  // and output values Pin name Signal Direction Config Initial State Config
+  // and output values
+  // Pin name Signal Direction Config Initial State Config
   // ADBUS0 SCK output 1 low 0
   // ADBUS1 MOSI output 1 low 0
   // ADBUS2 MISO input 0 low 0
@@ -219,7 +220,8 @@ bool config_spi(struct ftdi_context *ftdi) {
   }
 
   // Set initial states of the MPSSE interface - high byte, both pin directions
-  // and output values Pin name Signal Direction Config Initial State Config
+  // and output values
+  // Pin name Signal Direction Config Initial State Config
   // ACBUS0 GPIOH0 input 0 0
   // ACBUS1 GPIOH1 input 0 0
   // ACBUS2 GPIOH2 input 0 0

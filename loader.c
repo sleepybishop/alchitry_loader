@@ -5,10 +5,12 @@
 
 static bool loader_set_IR(struct loader_ctx *loader, enum instruction);
 static bool loader_shift_DR(struct loader_ctx *loader, int bits, char *write,
-                             char *read, char *mask);
-static bool loader_shift_IR(struct loader_ctx *loader, int, char *, char *, char *);
+                            char *read, char *mask);
+static bool loader_shift_IR(struct loader_ctx *loader, int, char *, char *,
+                            char *);
 static bool loader_load_bin(struct loader_ctx *loader, char *file);
-static bool loader_set_state(struct loader_ctx *loader, enum jtag_fsm_state state);
+static bool loader_set_state(struct loader_ctx *loader,
+                             enum jtag_fsm_state state);
 
 static unsigned char reverse(unsigned char b) {
   b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
@@ -30,7 +32,8 @@ static size_t slurp_file(char *file, char **buf, bool rev) {
     sz = fread(tmp, 1, sz, fp);
     for (int j = 0; j < sz; j++) {
       unsigned char b = tmp[sz - j - 1];
-      if (rev) b = reverse(b);
+      if (rev)
+        b = reverse(b);
       ret += sprintf(*buf + ret, "%02x", b);
     }
     free(tmp);
