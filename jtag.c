@@ -9,6 +9,13 @@
 static bool sync_mpsse(struct ftdi_context *ftdi);
 static bool config_jtag(struct ftdi_context *ftdi);
 
+static unsigned char reverse(unsigned char b) {
+  b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+  b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+  b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+  return b;
+}
+
 static unsigned char byte_from_hex_string(char *hex, unsigned int offset,
                                           unsigned int num) {
   char tmp[3] = {0, 0, 0};
@@ -106,8 +113,6 @@ void jtag_shutdown(struct jtag_ctx *jtag) {
   if (jtag) {
     if (jtag->active) {
       ftdi_set_bitmode(jtag->ftdi, 0, BITMODE_RESET);
-      ftdi_usb_close(jtag->ftdi);
-      ftdi_deinit(jtag->ftdi);
     }
     free(jtag);
     jtag = NULL;
@@ -264,16 +269,28 @@ bool jtag_navigate_to_state(struct jtag_ctx *jtag, enum jtag_fsm_state init,
 }
 
 bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
-                     char *tdo, char *mask) {
+                     char *tdo, char *mask, bool from_file) {
   unsigned char cmd[3];
   int cmdlen = sizeof(cmd);
+
+  unsigned char tdo_buf[bits / 8 + 8];
+  unsigned int tdo_bytes = 0;
+
+  /* hack */
+  FILE *fp = NULL;
+  bool rev = (bits == 1);
+  if (from_file) {
+    fp = fopen(tdi, "rb");
+    if (!fp) return false;
+    fseek(fp, 0, SEEK_END);
+    bits = ftell(fp) * 8;
+    fseek(fp, 0, SEEK_SET);
+  }
+
   unsigned int req_bytes = bits / 8 + (bits % 8 > 0);
   unsigned int req_hex = bits / 4 + (bits % 4 > 0);
 
-  unsigned char *tdo_buf = NULL;
-  unsigned int tdo_bytes = 0;
-
-  if (strlen(tdi) < req_hex)
+  if (!from_file && strlen(tdi) < req_hex)
     return false;
 
   bool read = (tdo != NULL) && (strlen(tdo) > 0);
@@ -308,10 +325,8 @@ bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
     }
 
     if (read) {
-      tdo_buf = calloc(1, 3);
       tdo_bytes = ftdi_read_data(jtag->ftdi, cmd, 2);
       if (tdo_bytes != 2) {
-        free(tdo_buf);
         fprintf(stderr, "Got %d TDO bytes where as only %d was expected\n",
                 tdo_bytes, 2);
         return false;
@@ -321,12 +336,14 @@ bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
       tdo_buf[0] |= cmd[1] >> (7 - (bits - 1));
     }
   } else {
-    unsigned char *tdi_buf = calloc(1, req_bytes + 1);
-    for (unsigned int i = 0; i < req_hex / 2; i++) {
-      tdi_buf[i] = byte_from_hex_string(tdi, req_hex - 2 - i * 2, 2);
-    }
-    if ((req_hex & 1) != 0) {
-      tdi_buf[req_hex / 2] = byte_from_hex_string(tdi, 0, 1);
+    unsigned char tdi_buf[req_bytes + 6];
+    if (!from_file) {
+      for (unsigned int i = 0; i < req_hex / 2; i++) {
+        tdi_buf[i] = byte_from_hex_string(tdi, req_hex - 2 - i * 2, 2);
+      }
+      if ((req_hex & 1) != 0) {
+        tdi_buf[req_hex / 2] = byte_from_hex_string(tdi, 0, 1);
+      }
     }
 
     unsigned int full_bytes = (bits - 1) / 8;
@@ -346,13 +363,27 @@ bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
       if (cmdlen != ftdi_write_data(jtag->ftdi, cmd, cmdlen)) {
         return false;
       }
-      if (bct != ftdi_write_data(jtag->ftdi, tdi_buf + offset, bct)) {
-        return false;
+      if (from_file) {
+        unsigned char tdi_chunk[bct];
+        fread(tdi_chunk, 1, bct, fp);
+        if (rev) {
+          for (unsigned int i = 0; i < bct; i++) {
+            tdi_chunk[i] = reverse(tdi_chunk[i]);
+          }
+        }
+        if (bct != ftdi_write_data(jtag->ftdi, tdi_chunk, bct)) {
+          return false;
+        }
+      } else {
+        if (bct != ftdi_write_data(jtag->ftdi, tdi_buf + offset, bct)) {
+          return false;
+        }
       }
 
       rem_bytes -= bct;
       offset += bct;
     }
+    if (fp) fclose(fp);
 
     unsigned int partial_bits = bits - 1 - (full_bytes * 8);
     if (full_bytes * 8 + 1 != bits) {
@@ -374,14 +405,13 @@ bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
     }
 
     if (read) {
-      unsigned char *ibuf = calloc(1, req_bytes + 6);
+      unsigned char ibuf[req_bytes + 6];
       size_t bytes_to_read =
           full_bytes + ((full_bytes * 8 + 1 != bits) ? 2 : 1);
       if (bytes_to_read != ftdi_read_data(jtag->ftdi, ibuf, bytes_to_read)) {
         return false;
       }
 
-      tdo_buf = calloc(1, req_bytes + 6);
       for (unsigned int i = 0; i < full_bytes; i++) {
         tdo_buf[tdo_bytes++] = ibuf[i];
       }
@@ -392,17 +422,15 @@ bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
       } else {
         tdo_buf[tdo_bytes++] = ibuf[bytes_to_read - 1] >> 7;
       }
-      free(ibuf);
     }
   }
 
   bool ret = true;
-  if (read) {
+  if (read && mask) {
     // Read out the data from input buffer
-    char *hextdo;
+    char hextdo[tdo_bytes * 2 + 1];
     int hextdoat = 0;
     int tdo_off = tdo_bytes - strlen(mask) / 2;
-    hextdo = calloc(1, tdo_bytes * 2 + 1);
 
     for (int i = tdo_bytes - 1 - tdo_off; i >= 0; i--) {
       sprintf(hextdo + hextdoat, "%02X", tdo_buf[i]);
@@ -416,7 +444,6 @@ bool jtag_shift_data(struct jtag_ctx *jtag, unsigned int bits, char *tdi,
       fprintf(stderr, "MASK:      %s\n", mask);
       ret = true;
     }
-    free(hextdo);
   }
   return ret;
 }

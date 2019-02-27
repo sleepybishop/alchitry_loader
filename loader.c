@@ -5,42 +5,12 @@
 
 static bool loader_set_IR(struct loader_ctx *loader, enum instruction);
 static bool loader_shift_DR(struct loader_ctx *loader, int bits, char *write,
-                            char *read, char *mask);
+                            char *read, char *mask, bool from_file);
 static bool loader_shift_IR(struct loader_ctx *loader, int, char *, char *,
                             char *);
 static bool loader_load_bin(struct loader_ctx *loader, char *file);
 static bool loader_set_state(struct loader_ctx *loader,
                              enum jtag_fsm_state state);
-
-static unsigned char reverse(unsigned char b) {
-  b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-  b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-  b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-  return b;
-}
-
-static size_t slurp_file(char *file, char **buf, bool rev) {
-  size_t ret = 0;
-  FILE *fp = fopen(file, "r");
-  if (fp) {
-    size_t sz = 0;
-    fseek(fp, 0, SEEK_END);
-    sz = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    char *tmp = calloc(1, sz);
-    *buf = calloc(2, sz + 1);
-    sz = fread(tmp, 1, sz, fp);
-    for (int j = 0; j < sz; j++) {
-      unsigned char b = tmp[sz - j - 1];
-      if (rev)
-        b = reverse(b);
-      ret += sprintf(*buf + ret, "%02x", b);
-    }
-    free(tmp);
-    fclose(fp);
-  }
-  return ret;
-}
 
 struct loader_ctx *loader_new(struct jtag_ctx *dev) {
   struct loader_ctx *loader = calloc(1, sizeof(struct loader_ctx));
@@ -71,7 +41,7 @@ bool loader_set_IR(struct loader_ctx *loader, enum instruction inst) {
     fprintf(stderr, "Failed to change to SHIFT_IR state!\n");
     return false;
   }
-  if (!jtag_shift_data(loader->device, 6, inst_str, "", "")) {
+  if (!jtag_shift_data(loader->device, 6, inst_str, "", "", false)) {
     fprintf(stderr, "Failed to shift instruction data!\n");
     return false;
   }
@@ -84,13 +54,13 @@ bool loader_set_IR(struct loader_ctx *loader, enum instruction inst) {
 }
 
 bool loader_shift_DR(struct loader_ctx *loader, int bits, char *write,
-                     char *read, char *mask) {
+                     char *read, char *mask, bool from_file) {
   if (!jtag_navigate_to_state(loader->device, loader->current_state,
                               SHIFT_DR)) {
     fprintf(stderr, "Failed to change to SHIFT_DR state!\n");
     return false;
   }
-  if (!jtag_shift_data(loader->device, bits, write, read, mask)) {
+  if (!jtag_shift_data(loader->device, bits, write, read, mask, from_file)) {
     fprintf(stderr, "Failed to shift data!\n");
     return false;
   }
@@ -109,7 +79,7 @@ bool loader_shift_IR(struct loader_ctx *loader, int bits, char *write,
     fprintf(stderr, "Failed to change to SHIFT_IR state!\n");
     return false;
   }
-  if (!jtag_shift_data(loader->device, bits, write, read, mask)) {
+  if (!jtag_shift_data(loader->device, bits, write, read, mask, false)) {
     fprintf(stderr, "Failed to shift data!\n");
     return false;
   }
@@ -122,9 +92,6 @@ bool loader_shift_IR(struct loader_ctx *loader, int bits, char *write,
 }
 
 bool loader_load_bin(struct loader_ctx *loader, char *file) {
-  char *binstr = NULL;
-  size_t binstrlen = slurp_file(file, &binstr, true);
-
   if (!jtag_set_freq(loader->device, 10000000)) {
     fprintf(stderr, "Failed to set JTAG frequency!\n");
     return false;
@@ -150,11 +117,9 @@ bool loader_load_bin(struct loader_ctx *loader, char *file) {
   // config/slr
   if (!loader_set_IR(loader, CFG_IN))
     return false;
-  if (!loader_shift_DR(loader, binstrlen * 4, binstr, "", "")) {
-    free(binstr);
+  if (!loader_shift_DR(loader, 1, file, "", "", true)) {
     return false;
   }
-  free(binstr);
 
   // config/start
   if (!loader_set_state(loader, RUN_TEST_IDLE))
@@ -178,11 +143,11 @@ bool loader_load_bin(struct loader_ctx *loader, char *file) {
   if (!loader_set_IR(loader, CFG_IN))
     return false;
   if (!loader_shift_DR(loader, 160, "0000000400000004800700140000000466aa9955",
-                       "", ""))
+                       "", "", false))
     return false;
   if (!loader_set_IR(loader, CFG_OUT))
     return false;
-  if (!loader_shift_DR(loader, 32, "00000000", "3f5e0d40", "08000000"))
+  if (!loader_shift_DR(loader, 32, "00000000", "3f5e0d40", "08000000", false))
     return false;
   if (!loader_set_state(loader, TEST_LOGIC_RESET))
     return false;
@@ -210,7 +175,7 @@ bool loader_erase_flash(struct loader_ctx *loader, char *loader_file) {
   if (!loader_set_IR(loader, USER1))
     return false;
 
-  if (!loader_shift_DR(loader, 1, "0", "", ""))
+  if (!loader_shift_DR(loader, 1, "0", "", "", false))
     return false;
 
   usleep(10000000);
@@ -229,9 +194,6 @@ bool loader_erase_flash(struct loader_ctx *loader, char *loader_file) {
 bool loader_write_bin(struct loader_ctx *loader, char *bin_file, bool flash,
                       char *loader_file) {
   if (flash) {
-    char *binstr = NULL;
-    size_t binstrlen = slurp_file(bin_file, &binstr, false);
-
     fprintf(stdout, "Initializing FPGA...\n");
     if (!loader_load_bin(loader, loader_file)) {
       fprintf(stderr, "Failed to initialize FPGA!\n");
@@ -249,7 +211,7 @@ bool loader_write_bin(struct loader_ctx *loader, char *bin_file, bool flash,
     if (!loader_set_IR(loader, USER1))
       return false;
 
-    if (!loader_shift_DR(loader, 1, "0", "", ""))
+    if (!loader_shift_DR(loader, 0, "0", "", "", false))
       return false;
 
     usleep(100000);
@@ -260,11 +222,9 @@ bool loader_write_bin(struct loader_ctx *loader, char *bin_file, bool flash,
     if (!loader_set_IR(loader, USER2))
       return false;
 
-    if (!loader_shift_DR(loader, binstrlen * 4, binstr, "", "")) {
-      free(binstr);
+    if (!loader_shift_DR(loader, 0, bin_file, "", "", true)) {
       return false;
     }
-    free(binstr);
 
     // If you enter the reset state after a write
     // the loader firmware resets the flash into
@@ -303,7 +263,7 @@ bool loader_check_IDCODE(struct loader_ctx *loader) {
     return false;
 
   if (!loader_shift_DR(loader, 32, "00000000", "0362D093",
-                       "0FFFFFFF")) // FPGA IDCODE
+                       "0FFFFFFF", false)) // FPGA IDCODE
     return false;
 
   return true;

@@ -6,5 +6,4 @@ if you have a platform which is supported by the original loaders it would be ad
 
 TODO:
 * handle cases when FT2232H is blank
-* better allocation cleanup
 

@@ -173,12 +173,12 @@ void print_usage() {
   fprintf(stdout, "Arguments:\n");
   fprintf(stdout, "  -e : erase FPGA flash\n");
   fprintf(stdout, "  -l : list detected boards\n");
+  fprintf(stdout, "  -u : write FTDI eeprom\n");
   fprintf(stdout, "  -h : print this help message\n");
   fprintf(stdout, "  -f config.bin : write FPGA flash\n");
   fprintf(stdout, "  -r config.bin : write FPGA RAM\n");
-  fprintf(stdout, "  -u config.data : write FTDI eeprom\n");
-  fprintf(stdout, "  -b n : select board \"n\" (defaults to 0)\n");
   fprintf(stdout, "  -p loader.bin : Au bridge bin\n");
+  fprintf(stdout, "  -b n : select board \"n\" (defaults to 0)\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -195,11 +195,6 @@ int main(int argc, char *argv[]) {
   int device_num = 0;
 
   struct ftdi_context *ftdi;
-  if ((ftdi = ftdi_new()) == 0) {
-    fprintf(stderr, "Failed to allocate ftdi structure :%s \n",
-            ftdi_get_error_string(ftdi));
-    return EXIT_FAILURE;
-  }
 
   while ((i = getopt(argc, argv, "elhf:r:ub:p:t:")) != -1) {
     switch (i) {
@@ -239,14 +234,22 @@ int main(int argc, char *argv[]) {
         fprintf(stdout, "Invalid board type\n");
         print = true;
       }
+      break;
     default:
       print_usage();
+      return 0;
     }
   }
 
   if (print) {
     print_usage();
     return 0;
+  }
+
+  if ((ftdi = ftdi_new()) == 0) {
+    fprintf(stderr, "Failed to allocate ftdi structure :%s \n",
+        ftdi_get_error_string(ftdi));
+    return EXIT_FAILURE;
   }
 
   if (list) {
@@ -303,6 +306,7 @@ int main(int argc, char *argv[]) {
       }
 
       jtag_shutdown(jtag);
+      free(loader);
     } else if (board_type == BOARD_CU) {
       ftdi_usb_open(ftdi, VID, PID);
       struct spi_ctx *spi = spi_new(ftdi);
