@@ -5,7 +5,6 @@ this is the Alchitry C++ loader rewritten in C and the closed sourced D2XX drive
 if you have a platform which is supported by the original loaders it would be advisable to stick with those.
 
 TODO:
-* SPI support for the CU
 * handle cases when FT2232H is blank
 * better allocation cleanup
 

@@ -1,7 +1,8 @@
 OBJS=\
 jtag_fsm.o\
 jtag.o\
-loader.o
+loader.o\
+spi.o
 
 CFLAGS = -g -Wall -std=c99 -I/usr/include/libftdi1 -D_DEFAULT_SOURCE
 LDFLAGS  = -lpthread -lftdi1

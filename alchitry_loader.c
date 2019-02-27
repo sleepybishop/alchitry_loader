@@ -11,7 +11,7 @@
 #include "jtag.h"
 #include "jtag_fsm.h"
 #include "loader.h"
-//#include "spi.h"
+#include "spi.h"
 
 #define BOARD_ERROR -2
 #define BOARD_UNKNOWN -1
@@ -27,8 +27,8 @@
  * Release: 0x0700
  * Bus Powered: 500 mA
  * Manufacturer: Alchitry
- * Product:      Alchitry Au
- * Serial:       FT3KRFFN
+ * Product:      Alchitry Au|Cu
+ * Serial:       FT3KRFFN|FT3WSDT8
  * Checksum      : c909
  * Attached EEPROM: 93x56
  * PNP: 1
@@ -54,7 +54,8 @@ void erase(struct ftdi_context *ftdi) {
   fprintf(stdout, "Done.\n");
 }
 
-bool program_device(struct ftdi_context *ftdi, unsigned int device_num, bool au) {
+bool program_device(struct ftdi_context *ftdi, unsigned int device_num,
+                    bool au) {
 
   if (0 >
       ftdi_set_interface(ftdi, (device_num == 0) ? INTERFACE_A : INTERFACE_B)) {
@@ -303,10 +304,31 @@ int main(int argc, char *argv[]) {
 
       jtag_shutdown(jtag);
     } else if (board_type == BOARD_CU) {
+      ftdi_usb_open(ftdi, VID, PID);
+      struct spi_ctx *spi = spi_new(ftdi);
+      if (spi_initialize(spi) == false) {
+        fprintf(stderr, "Failed to initialize SPI!\n");
+        return 2;
+      }
+
+      if (erase) {
+        if (!spi_erase_flash(spi)) {
+          fprintf(stderr, "Failed to erase flash!\n");
+        } else {
+          fprintf(stdout, "Done.\n");
+        }
+      }
+
+      if (fpga_flash) {
+        if (!spi_write_bin(spi, fpga_bin_flash)) {
+          fprintf(stderr, "Failed to write FPGA flash!\n");
+        }
+      }
+
       if (fpga_ram) {
         fprintf(stderr, "Alchitry Cu doesn't support RAM only programming!\n");
+        return 1;
       }
-      return 1;
     } else {
       fprintf(stderr, "Unknown board type!\n");
       return 2;
