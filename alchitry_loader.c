@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  while ((i = getopt(argc, argv, "elhf:r:u:b:p:t:")) != -1) {
+  while ((i = getopt(argc, argv, "elhf:r:ub:p:t:")) != -1) {
     switch (i) {
     case 'e':
       erase = true;
