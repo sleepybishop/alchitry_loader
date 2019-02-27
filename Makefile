@@ -10,7 +10,7 @@ LDFLAGS  = -lpthread -lftdi1
 alchitry_loader: alchitry_loader.c $(OBJS)
 	$(CC) $< -o $@ $(OBJS) $(CFLAGS) $(LDFLAGS)
 
-.PHONY: clean indent scan
+.PHONY: clean indent scan install
 clean:
 	$(RM) alchitry_loader *.o 
 
@@ -19,4 +19,8 @@ indent:
 
 scan:
 	scan-build $(MAKE) clean all
+
+install: alchitry_loader
+	install --mode=0755 --owner root --group root --dir $(DESTDIR)/bin
+	install --mode=0755 --owner root --group root $^ $(DESTDIR)/bin
 
