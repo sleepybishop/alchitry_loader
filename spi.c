@@ -157,8 +157,6 @@ void spi_shutdown(struct spi_ctx *spi) {
   if (spi) {
     if (spi->active) {
       ftdi_set_bitmode(spi->ftdi, 0, BITMODE_RESET);
-      ftdi_usb_close(spi->ftdi);
-      ftdi_deinit(spi->ftdi);
     }
     free(spi);
     spi = NULL;

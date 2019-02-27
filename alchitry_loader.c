@@ -103,6 +103,8 @@ bool program_device(struct ftdi_context *ftdi, unsigned int device_num,
   ftdi_eeprom_decode(ftdi, 1);
 
   fprintf(stdout, "Done.\n");
+  ftdi_usb_close(ftdi);
+
   return true;
 }
 
@@ -254,22 +256,24 @@ int main(int argc, char *argv[]) {
 
   if (list) {
     print_devices(ftdi);
+    ftdi_free(ftdi);
     return 0;
   }
 
   if (eeprom) {
     program_device(ftdi, device_num, is_au);
+    ftdi_free(ftdi);
     return 0;
   }
 
   if (erase || fpga_flash || fpga_ram) {
     int board_type = get_device_type(ftdi, device_num);
+    ftdi_usb_open(ftdi, VID, PID);
     if (board_type == BOARD_AU) {
       if (bridge_provided == false && (erase || fpga_flash)) {
         fprintf(stderr, "No Au bridge bin provided!\n");
         return 2;
       }
-      ftdi_usb_open(ftdi, VID, PID);
       struct jtag_ctx *jtag = jtag_new(ftdi);
       if (jtag_initialize(jtag) == false) {
         fprintf(stderr, "Failed to initialize JTAG!\n");
@@ -308,7 +312,6 @@ int main(int argc, char *argv[]) {
       jtag_shutdown(jtag);
       free(loader);
     } else if (board_type == BOARD_CU) {
-      ftdi_usb_open(ftdi, VID, PID);
       struct spi_ctx *spi = spi_new(ftdi);
       if (spi_initialize(spi) == false) {
         fprintf(stderr, "Failed to initialize SPI!\n");
@@ -331,12 +334,15 @@ int main(int argc, char *argv[]) {
 
       if (fpga_ram) {
         fprintf(stderr, "Alchitry Cu doesn't support RAM only programming!\n");
-        return 1;
       }
+
+      spi_shutdown(spi);
     } else {
       fprintf(stderr, "Unknown board type!\n");
       return 2;
     }
+    ftdi_usb_close(ftdi);
   }
+  ftdi_free(ftdi);
   return 0;
 }
