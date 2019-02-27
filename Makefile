@@ -7,6 +7,8 @@ spi.o
 CFLAGS = -g -Wall -std=c99 -I/usr/include/libftdi1 -D_DEFAULT_SOURCE
 LDFLAGS  = -lpthread -lftdi1
 
+all: alchitry_loader
+
 alchitry_loader: alchitry_loader.c $(OBJS)
 	$(CC) $< -o $@ $(OBJS) $(CFLAGS) $(LDFLAGS)
 
